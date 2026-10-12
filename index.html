@@ -1,0 +1,1205 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reto Emoji · Imita el gesto</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0c1020; --line: rgba(255,255,255,.14);
+    --text: #f4f2ee; --muted: #a9b0c4; --ok: #6ff0c8; --bad: #ff5c7a; --warn: #ffd34d; --accent: #c89bff;
+    --font: "Bricolage Grotesque", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; background: #000; color: var(--text); font-family: var(--font); overflow: hidden; }
+  button, input, select { font-family: inherit; }
+  button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid var(--ok); outline-offset: 2px; }
+
+  #game { position: fixed; inset: 0; width: 100%; height: 100%; object-fit: contain; background: #000; }
+  #video { position: fixed; width: 2px; height: 2px; opacity: 0; pointer-events: none; }
+
+  .screen {
+    position: fixed; inset: 0; z-index: 10; overflow-y: auto;
+    display: flex; justify-content: center; align-items: flex-start; padding: 32px 20px;
+    background:
+      radial-gradient(60vmax 60vmax at 10% 10%, rgba(111,240,200,.16), transparent 60%),
+      radial-gradient(50vmax 50vmax at 90% 90%, rgba(200,155,255,.18), transparent 60%),
+      var(--bg);
+    transition: opacity .3s ease;
+  }
+  .screen.hidden { opacity: 0; pointer-events: none; }
+  .card { width: 100%; max-width: 760px; margin: auto 0; }
+  h1 { font-size: clamp(40px, 7vw, 68px); font-weight: 800; line-height: .95; letter-spacing: -.03em; margin-bottom: 12px; }
+  h1 .emo { display: inline-block; transform: rotate(-8deg); }
+  .lead { font-size: 17px; line-height: 1.5; color: #d3d7e4; margin-bottom: 24px; max-width: 56ch; }
+  .box { background: rgba(255,255,255,.05); border: 1px solid var(--line); border-radius: 18px; padding: 18px; margin-bottom: 16px; }
+  .box h2 { font-size: 16px; font-weight: 800; margin-bottom: 12px; }
+
+  .modes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .mode-card {
+    display: flex; flex-direction: column; gap: 6px; padding: 16px; border-radius: 16px; cursor: pointer;
+    border: 2px solid var(--line); background: rgba(255,255,255,.05); transition: border-color .15s ease, background .15s ease;
+  }
+  .mode-card:hover { background: rgba(255,255,255,.09); }
+  .mode-card:has(input:checked) { border-color: var(--ok); background: rgba(111,240,200,.12); }
+  .mode-card input { position: absolute; opacity: 0; pointer-events: none; }
+  .mode-card:has(input:focus-visible) { outline: 3px solid var(--ok); outline-offset: 2px; }
+  .mc-emo { font-size: 34px; }
+  .mode-card b { font-size: 17px; }
+  .mode-card small { font-size: 13px; color: var(--muted); line-height: 1.4; }
+
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  label.field { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--muted); }
+  select { background: #161b30; color: var(--text); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; font-size: 15px; }
+  .check { display: flex; gap: 10px; align-items: flex-start; font-size: 15px; line-height: 1.4; cursor: pointer; margin-top: 12px; }
+  .check input { margin-top: 3px; width: 18px; height: 18px; accent-color: var(--ok); flex: none; }
+
+  .consent { border-color: rgba(255,211,77,.55); background: rgba(255,211,77,.07); }
+  .consent h2 { color: var(--warn); }
+  .notice-main { font-size: 17px; font-weight: 800; line-height: 1.4; margin-bottom: 10px; }
+  .notice-detail { font-size: 14.5px; line-height: 1.55; color: #e3e6ef; }
+  .notice-detail p + p { margin-top: 6px; }
+
+  .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
+  .btn { border: 1px solid var(--line); background: rgba(255,255,255,.08); color: var(--text); padding: 14px 22px; border-radius: 16px; font-size: 16px; font-weight: 700; cursor: pointer; }
+  .btn:hover { background: rgba(255,255,255,.15); }
+  .btn:disabled { opacity: .4; cursor: not-allowed; }
+  .btn-primary { background: var(--ok); color: #08261d; border-color: transparent; }
+  .btn-primary:hover { background: #8ff5d6; }
+  .error { margin-top: 14px; padding: 12px 14px; border-radius: 12px; background: rgba(255,92,122,.15); border: 1px solid rgba(255,92,122,.5); color: #ffd0d8; display: none; line-height: 1.45; }
+  .error.show { display: block; }
+
+  #loadingScreen .card { text-align: center; max-width: 420px; }
+  .spinner { width: 64px; height: 64px; margin: 0 auto 20px; border-radius: 50%; border: 6px solid rgba(255,255,255,.15); border-top-color: var(--ok); animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #loadingText { font-size: 18px; font-weight: 600; }
+
+  /* Controles durante el juego (HTML: no salen en la grabación) */
+  .game-ctrl { position: fixed; top: 14px; right: 14px; z-index: 5; display: flex; gap: 8px; }
+  .game-ctrl.hidden { display: none; }
+  .game-ctrl .btn { padding: 10px 14px; font-size: 14px; background: rgba(17,22,40,.75); backdrop-filter: blur(8px); }
+
+  .score-big { font-size: 64px; font-weight: 800; line-height: 1; }
+  .score-sub { color: var(--muted); margin: 6px 0 18px; }
+  .cat-stats { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+  .cat-stats span { padding: 6px 12px; border-radius: 999px; background: rgba(255,255,255,.07); font-size: 14px; }
+  .table-wrap { overflow-x: auto; border-radius: 14px; border: 1px solid var(--line); }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th, td { padding: 9px 10px; text-align: left; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  th { color: var(--muted); font-weight: 600; background: rgba(255,255,255,.04); }
+  td.ok { color: var(--ok); font-weight: 700; }
+  td.bad { color: var(--bad); font-weight: 700; }
+  td.skip { color: var(--warn); font-weight: 700; }
+  td.emo { font-size: 22px; }
+  #videoPreview { width: 100%; border-radius: 14px; margin-top: 10px; background: #000; display: none; }
+  .note { font-size: 13px; color: var(--muted); line-height: 1.45; margin-top: 10px; }
+
+  @media (max-width: 680px) { .grid2, .modes { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+
+<video id="video" playsinline muted></video>
+<canvas id="game"></canvas>
+<div class="game-ctrl hidden" id="gameCtrl">
+  <button class="btn" id="fsBtn" title="Pantalla completa (F)">⛶ Pantalla completa</button>
+  <button class="btn" id="skipBtn" title="Saltar este reto (N)">Saltar reto</button>
+  <button class="btn" id="exitBtn">Terminar</button>
+</div>
+
+<!-- ======================= MENÚ ======================= -->
+<section class="screen" id="menuScreen">
+  <div class="card">
+    <h1>Reto <span class="emo">😜</span> Emoji</h1>
+    <p class="lead">Aparece un emoji y tienes unos segundos para imitarlo con tu cara, tus manos o tu cuerpo. La cámara detecta si lo lograste.</p>
+
+    <div class="box">
+      <h2>¿Cómo quieres jugar?</h2>
+      <div class="modes">
+        <label class="mode-card"><input type="radio" name="gm" value="todo" checked>
+          <span class="mc-emo">🎉</span><b>Todo</b><small>Muecas, gestos con las manos y poses de cuerpo. Primero los de cerca, después los de cuerpo completo.</small></label>
+        <label class="mode-card"><input type="radio" name="gm" value="cuerpo">
+          <span class="mc-emo">🤸</span><b>Poses de cuerpo</b><small>Brazos, piernas y cuerpo completo. Necesitas espacio para alejarte 2 o 3 metros.</small></label>
+        <label class="mode-card"><input type="radio" name="gm" value="muecas">
+          <span class="mc-emo">😜</span><b>Muecas y gestos</b><small>Expresiones de la cara y gestos con las manos. Puedes jugar sentado frente a la pantalla.</small></label>
+      </div>
+    </div>
+
+    <div class="box">
+      <h2>Partida</h2>
+      <div class="grid2">
+        <label class="field">Cantidad de retos
+          <select id="modeSel">
+            <option value="10">10 retos al azar</option>
+            <option value="5">5 retos al azar</option>
+            <option value="all">Modo prueba: todos los retos, uno de cada uno</option>
+          </select>
+        </label>
+        <label class="field">Tiempo por reto
+          <select id="timeSel">
+            <option value="5000" selected>5 segundos</option>
+            <option value="7000">7 segundos</option>
+            <option value="10000">10 segundos</option>
+          </select>
+        </label>
+      </div>
+      <label class="check"><input type="checkbox" id="fsChk" checked> Jugar en pantalla completa</label>
+      <label class="check"><input type="checkbox" id="showPts" checked> Mostrar los puntos que detecta la IA (sirve para revisar errores en el video)</label>
+    </div>
+
+    <div class="box consent">
+      <h2>📹 Aviso sobre la grabación</h2>
+      <div class="notice-main" id="noticeMain"></div>
+      <div class="notice-detail" id="noticeDetail"></div>
+      <label class="check"><input type="checkbox" id="consentChk"> Leí el aviso y acepto que se grabe mi sesión.</label>
+    </div>
+
+    <div class="actions">
+      <button class="btn btn-primary" id="playRecBtn" disabled>Jugar y grabar</button>
+      <button class="btn" id="playNoRecBtn">Jugar sin grabar</button>
+    </div>
+    <div class="error" id="errorBox"></div>
+  </div>
+</section>
+
+<section class="screen hidden" id="loadingScreen">
+  <div class="card">
+    <div class="spinner"></div>
+    <div id="loadingText">Preparando…</div>
+    <p class="note">La primera vez se descargan los modelos de IA; luego es más rápido.</p>
+  </div>
+</section>
+
+<section class="screen hidden" id="resultsScreen">
+  <div class="card">
+    <h1>Resultados</h1>
+    <div class="score-big" id="scoreBig">0/0</div>
+    <div class="score-sub" id="scoreSub"></div>
+    <div class="cat-stats" id="catStats"></div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>#</th><th></th><th>Reto</th><th>Resultado</th><th>Tiempo</th><th>Mejor detección</th><th>Problema más frecuente</th><th>Seg. en video</th></tr></thead>
+        <tbody id="resultsBody"></tbody>
+      </table>
+    </div>
+    <div id="videoBox" style="display:none">
+      <video id="videoPreview" controls playsinline></video>
+      <p class="note" id="videoNote"></p>
+    </div>
+    <div class="actions" style="margin-top:16px">
+      <button class="btn btn-primary" id="againBtn">Jugar otra vez</button>
+      <button class="btn" id="dlVideoBtn" style="display:none">Descargar video</button>
+      <button class="btn" id="dlCsvBtn">Descargar resultados (CSV)</button>
+      <button class="btn" id="menuBtn">Volver al menú</button>
+    </div>
+  </div>
+</section>
+
+<script>
+/* =========================================================================
+   RETO EMOJI v2
+   FLUIDEZ
+   - La detección corre UNA vez por cada frame nuevo de la cámara
+     (requestVideoFrameCallback) y el dibujo corre aparte a la tasa de la
+     pantalla (requestAnimationFrame). Así las animaciones van a 60 fps
+     aunque la cámara entregue 30, y nunca se procesa un frame repetido.
+   - Solo corre el detector que necesita el reto actual.
+   DETECCIÓN
+   - Los puntos y expresiones se suavizan (media móvil exponencial):
+     menos temblor, menos falsos "no detectado".
+   - Pose: modelo "full" (más preciso en piernas) con GPU; "lite" en CPU.
+   - Tolerancia de 250 ms a lecturas sueltas fallidas mientras mantienes el gesto.
+   ENCUADRE
+   - Antes de los retos de cuerpo, el juego revisa qué partes se ven
+     y avisa cuando el cuerpo está bien encuadrado. El tiempo del reto
+     no corre hasta que te ubiques, así no te "atascas".
+   ========================================================================= */
+(() => {
+  'use strict';
+
+  // ===================== AVISO DE GRABACIÓN =====================
+  const NOTICE_MAIN = 'El video se guardará para ser analizado por una IA y posteriormente borrado.';
+  const NOTICE_DETAIL = [
+    'Se grabará tu imagen de la cámara junto con los retos que aparecen en pantalla, sin audio.',
+    'Al terminar, el video se descargará en este dispositivo. Si lo envías a la persona responsable del proyecto, ella lo recibirá, podrá verlo y lo analizará con una herramienta de IA para revisar qué gestos detecta bien el juego. Después será borrado.',
+    'La detección de gestos ocurre en tu navegador: durante el juego no se envía tu imagen a ningún servidor. Si prefieres, puedes jugar sin grabar.',
+  ];
+
+  // ===================== CONFIG =====================
+  const TV = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14';
+  const MODELS = {
+    face: 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task',
+    hand: 'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task',
+    poseFull: 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task',
+    poseLite: 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task',
+  };
+  const HOLD_MS = 500;
+  const GRACE_MS = 250;
+  const FEEDBACK_MS = 1300;
+  const INTRO_MS = 3000;
+  const FRAME_OK_MS = 700;       // partes visibles seguidas para aprobar el encuadre
+  const FRAMED_MSG_MS = 900;     // mensaje "¡se ve tu cuerpo completo!"
+  const SMOOTH = 0.55;           // peso del frame nuevo en el suavizado (0..1)
+  const SMOOTH_FACE = 0.5;
+  const FRAME_VIS = 0.6;         // visibilidad mínima para el encuadre (más estricta que en juego)
+
+  const CAT_LABEL = { cara: 'Cara', manos: 'Manos', brazos: 'Brazos', piernas: 'Piernas', cuerpo: 'Cuerpo completo' };
+  const CAT_DET = { cara: 'face', manos: 'hand', brazos: 'pose', piernas: 'pose', cuerpo: 'pose' };
+  // Distancia a la cámara: cerca -> media -> lejos (se juega en ese orden)
+  const CAT_DISTANCE = { cara: 0, manos: 0, brazos: 1, piernas: 2, cuerpo: 2 };
+  const GAME_MODES = {
+    todo:   ['cara', 'manos', 'brazos', 'piernas', 'cuerpo'],
+    cuerpo: ['brazos', 'piernas', 'cuerpo'],
+    muecas: ['cara', 'manos'],
+  };
+  // Partes que deben verse antes de empezar cada tipo de reto
+  const REQUIRE = {
+    cara:    { msg: '¡Se ve bien tu cara!', parts: [{ n: 'Tu cara', face: true }] },
+    brazos:  { msg: '¡Se ven bien tu torso y tus brazos!', parts: [
+      { n: 'Cabeza', ids: [0] }, { n: 'Hombros', ids: [11, 12] }, { n: 'Codos', ids: [13, 14] }, { n: 'Manos', ids: [15, 16] }] },
+    piernas: { msg: '¡Se ve tu cuerpo completo!', parts: [
+      { n: 'Hombros', ids: [11, 12] }, { n: 'Caderas', ids: [23, 24] }, { n: 'Rodillas', ids: [25, 26] }, { n: 'Pies', ids: [27, 28] }] },
+    cuerpo:  { msg: '¡Se ve tu cuerpo completo!', parts: [
+      { n: 'Cabeza', ids: [0] }, { n: 'Manos', ids: [15, 16] }, { n: 'Caderas', ids: [23, 24] },
+      { n: 'Rodillas', ids: [25, 26] }, { n: 'Pies', ids: [27, 28] }] },
+  };
+
+  // ===================== DOM =====================
+  const $ = (id) => document.getElementById(id);
+  const video = $('video'), canvas = $('game');
+  const ctx = canvas.getContext('2d', { alpha: false });
+  let W = 1280, H = 720;
+
+  // ===================== UTILIDADES =====================
+  const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+  const ratio = (v, t) => clamp(v / t, 0, 1);
+  const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+  const dist3 = (a, b) => Math.hypot(a.x - b.x, a.y - b.y, (a.z || 0) - (b.z || 0));
+  const mid = (a, b) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+  function ang3(a, b, c) {
+    const ux = a.x - b.x, uy = a.y - b.y, uz = (a.z || 0) - (b.z || 0);
+    const vx = c.x - b.x, vy = c.y - b.y, vz = (c.z || 0) - (b.z || 0);
+    const d = Math.hypot(ux, uy, uz) * Math.hypot(vx, vy, vz) || 1;
+    return Math.acos(clamp((ux * vx + uy * vy + uz * vz) / d, -1, 1)) * 57.29578;
+  }
+  const ang2 = (a, b, c) => ang3({ x: a.x, y: a.y, z: 0 }, { x: b.x, y: b.y, z: 0 }, { x: c.x, y: c.y, z: 0 });
+
+  // ===================== CARA =====================
+  /** Convierte los blendshapes de MediaPipe en un objeto {nombre: valor 0..1}. */
+  function faceCheck(fn) {
+    return (res) => {
+      const cats = res && res.faceBlendshapes && res.faceBlendshapes[0] && res.faceBlendshapes[0].categories;
+      if (!cats) return { ok: false, score: 0, issue: 'No veo tu cara' };
+      const m = {};
+      for (const c of cats) m[c.categoryName] = c.score;
+      return fn(m, res.faceLandmarks[0]);
+    };
+  }
+
+  // ===================== MANOS =====================
+  const FINGER_IDS = { index: [5,6,7,8], middle: [9,10,11,12], ring: [13,14,15,16], pinky: [17,18,19,20] };
+  const FINGER_NAME = { thumb: 'pulgar', index: 'índice', middle: 'medio', ring: 'anular', pinky: 'meñique' };
+
+  /**
+   * Estado de cada dedo: 1 extendido, 0 doblado, -1 dudoso.
+   * Promedio de ángulos 3D de sus articulaciones: recto > 150°, doblado < 140°.
+   * Pulgar: rectitud + separación de su punta respecto al nudillo del índice.
+   */
+  function handFeat(lm, wl) {
+    const w = (wl && wl.length === 21) ? wl : lm;
+    const palm = dist3(w[0], w[9]) || 1e-6;
+    const f = {};
+    for (const [n, [m, p, d, t]] of Object.entries(FINGER_IDS)) {
+      const s = (ang3(w[0], w[m], w[p]) + ang3(w[m], w[p], w[d]) + ang3(w[p], w[d], w[t])) / 3;
+      f[n] = s > 150 ? 1 : s < 140 ? 0 : -1;
+    }
+    const tS = (ang3(w[1], w[2], w[3]) + ang3(w[2], w[3], w[4])) / 2;
+    const abd = dist3(w[4], w[5]) / palm;
+    f.thumb = (tS > 145 && abd > 0.55) ? 1 : (abd < 0.45 || tS < 130) ? 0 : -1;
+    const pts = lm.map((l) => ({ x: l.x * W, y: l.y * H }));
+    const tdx = pts[4].x - pts[2].x, tdy = pts[4].y - pts[2].y;
+    return { f, pinch: dist3(w[4], w[8]) / palm, thumbDirY: tdy / (Math.hypot(tdx, tdy) || 1),
+             pts, handSize: dist(pts[0], pts[9]) || 1 };
+  }
+
+  /**
+   * pat: patrón de dedos {thumb:1, index:0, ...} (null = no importa).
+   * extra(h): condición adicional (dirección del pulgar, pinza, etc.).
+   * Con dos manos en cámara, basta con que una cumpla.
+   */
+  function handCheck(pat, extra) {
+    return (res) => {
+      const hands = (res && res.landmarks) || [];
+      if (!hands.length) return { ok: false, score: 0, issue: 'No veo tu mano' };
+      let best = { ok: false, score: -1, issue: null };
+      hands.forEach((lm, i) => {
+        const h = handFeat(lm, res.worldLandmarks && res.worldLandmarks[i]);
+        let n = 0, good = 0;
+        const wrong = [];
+        for (const k of Object.keys(pat)) {
+          if (pat[k] === null) continue;
+          n++;
+          if (h.f[k] === pat[k]) good++; else wrong.push(FINGER_NAME[k]);
+        }
+        const fr = n ? good / n : 1;
+        const ex = extra ? extra(h) : { ok: true, score: 1 };
+        const score = extra ? fr * 0.7 + ex.score * 0.3 : fr;
+        const ok = good === n && ex.ok;
+        const issue = ok ? null : wrong.length ? `Revisa: ${wrong.join(', ')}` : ex.issue;
+        if (ok || score > best.score) best = { ok, score, issue };
+      });
+      return best;
+    };
+  }
+
+  // ===================== CUERPO =====================
+  const PART_NAME = { 0: 'cara', 11: 'hombros', 12: 'hombros', 13: 'codos', 14: 'codos', 15: 'muñecas', 16: 'muñecas',
+                      23: 'caderas', 24: 'caderas', 25: 'rodillas', 26: 'rodillas', 27: 'tobillos', 28: 'tobillos' };
+  /** Exige que los puntos necesarios sean visibles; si no, dice cuáles faltan. */
+  function poseCheck(ids, fn) {
+    return (res) => {
+      const lm = res && res.landmarks && res.landmarks[0];
+      if (!lm) return { ok: false, score: 0, issue: 'No veo tu cuerpo' };
+      const missing = ids.filter((i) => (lm[i].visibility ?? 1) < 0.5);
+      if (missing.length) {
+        const names = [...new Set(missing.map((i) => PART_NAME[i]))];
+        return { ok: false, score: 0, issue: `No se ven: ${names.join(', ')}` };
+      }
+      const P = (i) => ({ x: lm[i].x * W, y: lm[i].y * H });
+      const g = { P, sw: dist(P(11), P(12)) || 1, shMid: mid(P(11), P(12)), hipMid: mid(P(23), P(24)) };
+      g.torso = dist(g.shMid, g.hipMid) || 1;
+      return fn(g);
+    };
+  }
+  // Cuánto subió la muñeca: 0 a la altura del hombro, 1 a la altura de la nariz
+  const raise = (P, w, s) => clamp((P(s).y - P(w).y) / ((P(s).y - P(0).y) || 1), 0, 1);
+
+  const UPPER = [0, 11, 12, 13, 14, 15, 16];
+  const LEGS = [11, 12, 23, 24, 25, 26, 27, 28];
+  const FULL = [0, 11, 12, 15, 16, 23, 24, 25, 26, 27, 28];
+
+  // ===================== RETOS =====================
+  const CHALLENGES = [
+    // ---------- CARA ----------
+    { id: 'sonrisa', emoji: '😄', label: 'Sonríe mostrando los dientes', cat: 'cara',
+      check: faceCheck((m) => { const v = (m.mouthSmileLeft + m.mouthSmileRight) / 2; return { ok: v > 0.6, score: ratio(v, 0.6), issue: 'Sonríe más' }; }) },
+    { id: 'boca', emoji: '😮', label: 'Abre bien la boca', cat: 'cara',
+      check: faceCheck((m) => ({ ok: m.jawOpen > 0.5, score: ratio(m.jawOpen, 0.5), issue: 'Abre más la boca' })) },
+    { id: 'guino', emoji: '😉', label: 'Guiña un ojo', cat: 'cara',
+      check: faceCheck((m) => {
+        const hi = Math.max(m.eyeBlinkLeft, m.eyeBlinkRight), lo = Math.min(m.eyeBlinkLeft, m.eyeBlinkRight);
+        if (lo > 0.4) return { ok: false, score: 0.4, issue: 'Cerraste los dos ojos' };
+        return { ok: hi > 0.55 && lo < 0.3, score: ratio(hi, 0.55) * (lo < 0.3 ? 1 : 0.6), issue: 'Cierra solo un ojo' };
+      }) },
+    { id: 'ojos', emoji: '😌', label: 'Cierra los dos ojos', cat: 'cara',
+      check: faceCheck((m) => { const v = Math.min(m.eyeBlinkLeft, m.eyeBlinkRight); return { ok: v > 0.6, score: ratio(v, 0.6), issue: 'Cierra bien ambos ojos' }; }) },
+    { id: 'beso', emoji: '😗', label: 'Haz trompita (como un beso)', cat: 'cara',
+      check: faceCheck((m) => { const v = Math.max(m.mouthPucker, m.mouthFunnel * 0.9); return { ok: v > 0.6, score: ratio(v, 0.6), issue: 'Junta más los labios' }; }) },
+    { id: 'cejas', emoji: '😲', label: 'Levanta las cejas', cat: 'cara',
+      check: faceCheck((m) => { const v = Math.max(m.browInnerUp, (m.browOuterUpLeft + m.browOuterUpRight) / 2); return { ok: v > 0.5, score: ratio(v, 0.5), issue: 'Sube más las cejas' }; }) },
+    { id: 'ceno', emoji: '😠', label: 'Frunce el ceño', cat: 'cara',
+      check: faceCheck((m) => { const v = (m.browDownLeft + m.browDownRight) / 2; return { ok: v > 0.45, score: ratio(v, 0.45), issue: 'Baja y junta las cejas' }; }) },
+    { id: 'cachetes', emoji: '🐡', label: 'Infla los cachetes', cat: 'cara',
+      check: faceCheck((m) => ({ ok: m.cheekPuff > 0.35, score: ratio(m.cheekPuff, 0.35), issue: 'Infla más los cachetes' })) },
+    { id: 'inclinar', emoji: '🤔', label: 'Inclina la cabeza hacia un lado', cat: 'cara',
+      check: faceCheck((m, lm) => {
+        const dx = (lm[263].x - lm[33].x) * W, dy = (lm[263].y - lm[33].y) * H;
+        const a = Math.abs(Math.atan2(dy, Math.abs(dx))) * 57.3;
+        return { ok: a > 15, score: ratio(a, 15), issue: 'Inclina más la cabeza' };
+      }) },
+
+    // ---------- MANOS ----------
+    { id: 'abierta', emoji: '✋', label: 'Muestra la mano abierta', cat: 'manos',
+      check: handCheck({ thumb: 1, index: 1, middle: 1, ring: 1, pinky: 1 }) },
+    { id: 'puno', emoji: '✊', label: 'Cierra el puño', cat: 'manos',
+      check: handCheck({ thumb: 0, index: 0, middle: 0, ring: 0, pinky: 0 }) },
+    { id: 'paz', emoji: '✌️', label: 'Haz el signo de paz', cat: 'manos',
+      check: handCheck({ thumb: null, index: 1, middle: 1, ring: 0, pinky: 0 }) },
+    { id: 'like', emoji: '👍', label: 'Pulgar arriba', cat: 'manos',
+      check: handCheck({ thumb: 1, index: 0, middle: 0, ring: 0, pinky: 0 },
+        (h) => ({ ok: h.thumbDirY < -0.6, score: clamp(-h.thumbDirY / 0.6, 0, 1), issue: 'Apunta el pulgar hacia arriba' })) },
+    { id: 'dislike', emoji: '👎', label: 'Pulgar abajo', cat: 'manos',
+      check: handCheck({ thumb: 1, index: 0, middle: 0, ring: 0, pinky: 0 },
+        (h) => ({ ok: h.thumbDirY > 0.6, score: clamp(h.thumbDirY / 0.6, 0, 1), issue: 'Apunta el pulgar hacia abajo' })) },
+    { id: 'indice', emoji: '☝️', label: 'Apunta hacia arriba con el índice', cat: 'manos',
+      check: handCheck({ thumb: null, index: 1, middle: 0, ring: 0, pinky: 0 },
+        (h) => { const v = (h.pts[5].y - h.pts[8].y) / h.handSize; return { ok: v > 0.5, score: ratio(v, 0.5), issue: 'Apunta hacia arriba' }; }) },
+    { id: 'rock', emoji: '🤘', label: 'Cuernitos (índice y meñique)', cat: 'manos',
+      check: handCheck({ thumb: null, index: 1, middle: 0, ring: 0, pinky: 1 }) },
+    { id: 'shaka', emoji: '🤙', label: 'Pulgar y meñique estirados', cat: 'manos',
+      check: handCheck({ thumb: 1, index: 0, middle: 0, ring: 0, pinky: 1 }) },
+    { id: 'teamo', emoji: '🤟', label: 'Pulgar, índice y meñique estirados', cat: 'manos',
+      check: handCheck({ thumb: 1, index: 1, middle: 0, ring: 0, pinky: 1 }) },
+    { id: 'ok', emoji: '👌', label: 'Haz el gesto de OK', cat: 'manos',
+      check: handCheck({ middle: 1, ring: 1, pinky: 1 },
+        (h) => ({ ok: h.pinch < 0.35, score: clamp((0.7 - h.pinch) / 0.35, 0, 1), issue: 'Junta la punta del pulgar y el índice' })) },
+
+    // ---------- BRAZOS ----------
+    { id: 'unamano', emoji: '🙋', label: 'Levanta una sola mano', cat: 'brazos',
+      check: poseCheck(UPPER, ({ P }) => {
+        const r15 = raise(P, 15, 11), r16 = raise(P, 16, 12);
+        const up15 = P(15).y < P(0).y, up16 = P(16).y < P(0).y;
+        if (up15 && up16) return { ok: false, score: 0.5, issue: 'Solo una mano arriba' };
+        const low15 = P(15).y > P(11).y, low16 = P(16).y > P(12).y;
+        return { ok: (up15 && low16) || (up16 && low15), score: Math.max(r15, r16), issue: 'Sube la mano sobre la cabeza' };
+      }) },
+    { id: 'dosmanos', emoji: '🙌', label: 'Levanta los dos brazos', cat: 'brazos',
+      check: poseCheck(UPPER, ({ P }) => {
+        const s = Math.min(raise(P, 15, 11), raise(P, 16, 12));
+        return { ok: P(15).y < P(0).y && P(16).y < P(0).y, score: s, issue: 'Sube ambos brazos sobre la cabeza' };
+      }) },
+    { id: 'circulo', emoji: '🙆', label: 'Junta las manos sobre la cabeza', cat: 'brazos',
+      check: poseCheck(UPPER, ({ P, sw }) => {
+        const up = Math.min(raise(P, 15, 11), raise(P, 16, 12)), d = dist(P(15), P(16));
+        const ok = P(15).y < P(0).y && P(16).y < P(0).y && d < sw;
+        return { ok, score: up * 0.6 + clamp((2 * sw - d) / sw, 0, 1) * 0.4, issue: up < 1 ? 'Sube los brazos' : 'Junta las manos' };
+      }) },
+    { id: 'avion', emoji: '✈️', label: 'Abre los brazos como avión', cat: 'brazos',
+      check: poseCheck(UPPER, ({ P, sw }) => {
+        const lvl = Math.max(Math.abs(P(15).y - P(11).y), Math.abs(P(16).y - P(12).y));
+        const span = Math.abs(P(15).x - P(16).x);
+        const lvlS = lvl < 0.6 * sw ? 1 : clamp(1 - (lvl - 0.6 * sw) / sw, 0, 1);
+        return { ok: lvl < 0.6 * sw && span > 2.4 * sw, score: 0.5 * ratio(span, 2.4 * sw) + 0.5 * lvlS,
+                 issue: span < 2.4 * sw ? 'Estira más los brazos' : 'Brazos a la altura de los hombros' };
+      }) },
+    { id: 'biceps', emoji: '💪', label: 'Muestra el bíceps', cat: 'brazos',
+      check: poseCheck(UPPER, ({ P, sw }) => {
+        let best = { ok: false, score: 0, issue: 'Dobla el brazo con el puño hacia arriba' };
+        for (const [s, e, w] of [[11, 13, 15], [12, 14, 16]]) {
+          const a = ang2(P(s), P(e), P(w));
+          const bent = a < 115, wristUp = P(w).y < P(e).y, elbowLvl = Math.abs(P(e).y - P(s).y) < 0.7 * sw;
+          const sc = (bent ? 0.4 : 0.4 * clamp((180 - a) / 65, 0, 1)) + (wristUp ? 0.3 : 0) + (elbowLvl ? 0.3 : 0);
+          if (sc > best.score) best = { ok: bent && wristUp && elbowLvl, score: sc,
+            issue: !elbowLvl ? 'Sube el codo a la altura del hombro' : !wristUp ? 'Puño hacia arriba' : 'Dobla más el brazo' };
+        }
+        return best;
+      }) },
+    { id: 'cruz', emoji: '🙅', label: 'Cruza los brazos en X', cat: 'brazos',
+      check: poseCheck([...UPPER, 23, 24], ({ P, hipMid }) => {
+        const crossed = Math.sign(P(15).x - P(16).x) !== Math.sign(P(11).x - P(12).x);
+        const height = P(15).y < hipMid.y && P(16).y < hipMid.y && P(15).y > P(0).y && P(16).y > P(0).y;
+        return { ok: crossed && height, score: (crossed ? 0.6 : 0) + (height ? 0.4 : 0),
+                 issue: crossed ? 'Brazos a la altura del pecho' : 'Cruza las muñecas' };
+      }) },
+
+    // ---------- PIERNAS ----------
+    { id: 'rodilla', emoji: '🦵', label: 'Levanta una rodilla', cat: 'piernas', hint: 'Aléjate para que se vean tus pies',
+      check: poseCheck(LEGS, ({ P, torso }) => {
+        const d = Math.abs(P(25).y - P(26).y);
+        return { ok: d > 0.35 * torso, score: ratio(d, 0.35 * torso), issue: 'Sube más la rodilla' };
+      }) },
+    { id: 'sentadilla', emoji: '🏋️', label: 'Haz una sentadilla', cat: 'piernas', hint: 'Aléjate para que se vean tus pies',
+      check: poseCheck(LEGS, ({ P }) => {
+        // En sentadilla el muslo queda casi horizontal: su altura vertical
+        // es mucho menor que la de la canilla.
+        const thigh = ((P(25).y - P(23).y) + (P(26).y - P(24).y)) / 2;
+        const shin = ((P(27).y - P(25).y) + (P(28).y - P(26).y)) / 2 || 1;
+        const r = thigh / shin;
+        return { ok: r < 0.5, score: clamp((1 - r) / 0.5, 0, 1), issue: 'Baja más la cadera' };
+      }) },
+    { id: 'flamenco', emoji: '🦩', label: 'Párate en un solo pie', cat: 'piernas', hint: 'Aléjate para que se vean tus pies',
+      check: poseCheck(LEGS, ({ P, torso }) => {
+        const d = Math.abs(P(27).y - P(28).y);
+        return { ok: d > 0.3 * torso, score: ratio(d, 0.3 * torso), issue: 'Levanta más el pie' };
+      }) },
+
+    // ---------- CUERPO COMPLETO ----------
+    { id: 'estrella', emoji: '⭐', label: 'Haz una estrella con tu cuerpo', cat: 'cuerpo', hint: 'Brazos arriba abiertos y piernas separadas',
+      check: poseCheck(FULL, ({ P, sw }) => {
+        const armsUp = P(15).y < P(11).y && P(16).y < P(12).y;
+        const span = Math.abs(P(15).x - P(16).x), hipW = dist(P(23), P(24)) || 1;
+        const legs = Math.abs(P(27).x - P(28).x);
+        const s = ((armsUp ? 1 : 0) + ratio(span, 2.2 * sw) + ratio(legs, 2 * hipW)) / 3;
+        return { ok: armsUp && span > 2.2 * sw && legs > 2 * hipW, score: s,
+                 issue: !armsUp ? 'Sube los brazos' : legs < 2 * hipW ? 'Separa más las piernas' : 'Abre más los brazos' };
+      }) },
+    { id: 'disco', emoji: '🕺', label: 'Pose de disco: un brazo arriba, el otro abajo', cat: 'cuerpo', hint: 'Que se vea tu cuerpo completo',
+      check: poseCheck(FULL, ({ P, hipMid, torso }) => {
+        let best = { ok: false, score: 0, issue: 'Un brazo arriba en diagonal y el otro abajo' };
+        for (const [up, down, s] of [[15, 16, 11], [16, 15, 12]]) {
+          const isUp = P(up).y < P(0).y, isDown = P(down).y > hipMid.y - 0.15 * torso;
+          const sc = raise(P, up, s) * 0.6 + (isDown ? 0.4 : 0);
+          if (sc > best.score) best = { ok: isUp && isDown, score: sc, issue: isUp ? 'Baja el otro brazo' : 'Sube un brazo sobre la cabeza' };
+        }
+        return best;
+      }) },
+    { id: 'firmes', emoji: '🧍', label: 'Ponte firme con los brazos pegados', cat: 'cuerpo', hint: 'Que se vea tu cuerpo completo',
+      check: poseCheck(FULL, ({ P, torso }) => {
+        const d1 = Math.abs(P(15).y - P(23).y), d2 = Math.abs(P(16).y - P(24).y);
+        const worst = Math.max(d1, d2);
+        return { ok: worst < 0.35 * torso, score: clamp(1 - (worst - 0.35 * torso) / torso, 0, 1), issue: 'Baja los brazos junto al cuerpo' };
+      }) },
+  ];
+
+
+  // ===================== SUAVIZADO DE DETECCIONES =====================
+  /**
+   * Media móvil exponencial: valor = anterior + (nuevo − anterior) · α
+   * Con α = 0.55 se elimina el temblor del detector con un retraso
+   * imperceptible (~1 frame). Se aplica a puntos de cara, manos y cuerpo
+   * (incluida la "visibilidad" de cada punto) y a las expresiones faciales.
+   */
+  const copyPts = (arr) => arr.map((p) => ({ x: p.x, y: p.y, z: p.z || 0, visibility: p.visibility }));
+  function ema(prev, cur, a) {
+    if (!prev || prev.length !== cur.length) return copyPts(cur);
+    return cur.map((p, i) => {
+      const q = prev[i];
+      const vis = p.visibility === undefined ? undefined
+        : (q.visibility === undefined ? p.visibility : q.visibility + (p.visibility - q.visibility) * a);
+      return { x: q.x + (p.x - q.x) * a, y: q.y + (p.y - q.y) * a, z: q.z + ((p.z || 0) - q.z) * a, visibility: vis };
+    });
+  }
+  const smoothState = { face: null, hand: null, pose: null };
+
+  function smoothResult(kind, res) {
+    const prev = smoothState[kind];
+    let out;
+    if (kind === 'face') {
+      const lm = res.faceLandmarks && res.faceLandmarks[0];
+      const cats = res.faceBlendshapes && res.faceBlendshapes[0] && res.faceBlendshapes[0].categories;
+      if (!lm || !cats) { smoothState.face = null; return { faceLandmarks: [], faceBlendshapes: [] }; }
+      const pc = prev && prev.faceBlendshapes[0] && prev.faceBlendshapes[0].categories;
+      const ncats = cats.map((c, i) => ({ categoryName: c.categoryName,
+        score: pc && pc[i] ? pc[i].score + (c.score - pc[i].score) * SMOOTH_FACE : c.score }));
+      out = { faceLandmarks: [ema(prev && prev.faceLandmarks[0], lm, SMOOTH)], faceBlendshapes: [{ categories: ncats }] };
+    } else if (kind === 'hand') {
+      // Empareja cada mano con la más cercana del frame anterior (por la muñeca)
+      out = { landmarks: [], worldLandmarks: [] };
+      (res.landmarks || []).forEach((lm, i) => {
+        let j = -1, bd = Infinity;
+        if (prev) prev.landmarks.forEach((p, k) => { const d = Math.hypot(p[0].x - lm[0].x, p[0].y - lm[0].y); if (d < bd) { bd = d; j = k; } });
+        const match = j >= 0 && bd < 0.12;
+        out.landmarks.push(match ? ema(prev.landmarks[j], lm, SMOOTH) : copyPts(lm));
+        const wl = res.worldLandmarks && res.worldLandmarks[i];
+        out.worldLandmarks.push(wl ? (match && prev.worldLandmarks[j] ? ema(prev.worldLandmarks[j], wl, SMOOTH) : copyPts(wl)) : null);
+      });
+    } else {
+      const lm = res.landmarks && res.landmarks[0];
+      if (!lm) { smoothState.pose = null; return { landmarks: [] }; }
+      out = { landmarks: [ema(prev && prev.landmarks[0], lm, SMOOTH)] };
+    }
+    smoothState[kind] = out;
+    return out;
+  }
+
+  // ===================== DETECTORES =====================
+  let vision = null, fileset = null;
+  const detectors = {}, lastTs = { face: 0, hand: 0, pose: 0 };
+  let poseModelName = '';
+
+  async function createDetector(kind, delegate) {
+    if (kind === 'face') return vision.FaceLandmarker.createFromOptions(fileset, {
+      baseOptions: { modelAssetPath: MODELS.face, delegate }, runningMode: 'VIDEO', numFaces: 1, outputFaceBlendshapes: true,
+      minFaceDetectionConfidence: 0.5, minFacePresenceConfidence: 0.5, minTrackingConfidence: 0.5 });
+    if (kind === 'hand') return vision.HandLandmarker.createFromOptions(fileset, {
+      baseOptions: { modelAssetPath: MODELS.hand, delegate }, runningMode: 'VIDEO', numHands: 2,
+      minHandDetectionConfidence: 0.5, minHandPresenceConfidence: 0.5, minTrackingConfidence: 0.5 });
+    // Pose: "full" es más preciso (piernas, cuerpo lejos) pero pesado; solo con GPU
+    const model = delegate === 'GPU' ? MODELS.poseFull : MODELS.poseLite;
+    poseModelName = delegate === 'GPU' ? 'full' : 'lite';
+    return vision.PoseLandmarker.createFromOptions(fileset, {
+      baseOptions: { modelAssetPath: model, delegate }, runningMode: 'VIDEO', numPoses: 1,
+      minPoseDetectionConfidence: 0.5, minPosePresenceConfidence: 0.5, minTrackingConfidence: 0.5 });
+  }
+  async function ensureDetectors(kinds) {
+    if (!vision) {
+      $('loadingText').textContent = 'Cargando motor de IA…';
+      vision = await import(`${TV}/vision_bundle.mjs`);
+      fileset = await vision.FilesetResolver.forVisionTasks(`${TV}/wasm`);
+    }
+    const names = { face: 'cara', hand: 'manos', pose: 'cuerpo' };
+    for (const k of kinds) {
+      if (detectors[k]) continue;
+      $('loadingText').textContent = `Cargando detector de ${names[k]}…`;
+      try { detectors[k] = await createDetector(k, 'GPU'); }
+      catch (e) { console.warn(`GPU no disponible para ${k}, usando CPU`, e); detectors[k] = await createDetector(k, 'CPU'); }
+    }
+  }
+
+  // ===================== GRABACIÓN =====================
+  let recorder = null, chunks = [], recStart = 0, videoBlob = null, videoUrl = null, fileBase = '';
+  function pickMime() {
+    const opts = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm', 'video/mp4'];
+    return opts.find((m) => window.MediaRecorder && MediaRecorder.isTypeSupported(m)) || '';
+  }
+  function startRecording() {
+    const stream = canvas.captureStream(30);
+    const mimeType = pickMime();
+    recorder = new MediaRecorder(stream, mimeType ? { mimeType, videoBitsPerSecond: 3000000 } : {});
+    chunks = [];
+    recorder.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
+    recorder.start(1000);
+    recStart = performance.now();
+  }
+  function stopRecording() {
+    return new Promise((resolve) => {
+      if (!recorder || recorder.state === 'inactive') return resolve(null);
+      recorder.onstop = () => resolve(new Blob(chunks, { type: recorder.mimeType || 'video/webm' }));
+      recorder.stop();
+    });
+  }
+  function download(url, name) {
+    const a = document.createElement('a');
+    a.href = url; a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+  }
+  const videoExt = () => (videoBlob && videoBlob.type.includes('mp4') ? 'mp4' : 'webm');
+
+  // ===================== SONIDO =====================
+  let actx = null;
+  function beep(freq, dur, type = 'sine') {
+    try {
+      actx = actx || new AudioContext();
+      const o = actx.createOscillator(), g = actx.createGain();
+      o.type = type; o.frequency.value = freq;
+      g.gain.setValueAtTime(0.15, actx.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + dur);
+      o.connect(g).connect(actx.destination);
+      o.start(); o.stop(actx.currentTime + dur);
+    } catch (_) { /* sin audio */ }
+  }
+
+  // ===================== PANTALLA COMPLETA =====================
+  function enterFullscreen() {
+    const el = document.documentElement;
+    if (!document.fullscreenElement && el.requestFullscreen) el.requestFullscreen().catch(() => {});
+  }
+  function toggleFullscreen() {
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+    else enterFullscreen();
+  }
+  document.addEventListener('fullscreenchange', () => {
+    $('fsBtn').textContent = document.fullscreenElement ? '⛶ Salir de pantalla completa' : '⛶ Pantalla completa';
+  });
+
+  // ===================== ESTADO DEL JUEGO =====================
+  const game = { state: 'menu', list: [], idx: 0, cur: null, results: [], recording: false,
+                 roundMs: 5000, showPts: true, introStart: 0, lastReq: null, gameMode: 'todo',
+                 latest: { kind: null, res: null } };
+
+  function shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+
+  /** Retos al azar, pero ordenados de cerca a lejos para no ir y volver frente a la cámara. */
+  function buildList(cats, mode) {
+    const pool = CHALLENGES.filter((c) => cats.includes(c.cat));
+    let list;
+    if (mode === 'all') list = pool.slice();
+    else {
+      const n = Number(mode); list = [];
+      while (list.length < n) list.push(...shuffle(pool.slice()));
+      list = list.slice(0, n);
+    }
+    shuffle(list);
+    return list.sort((a, b) => CAT_DISTANCE[a.cat] - CAT_DISTANCE[b.cat] || cats.indexOf(a.cat) - cats.indexOf(b.cat));
+  }
+  function stamp() {
+    const d = new Date(), p = (v) => String(v).padStart(2, '0');
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}_${p(d.getHours())}-${p(d.getMinutes())}-${p(d.getSeconds())}`;
+  }
+
+  async function startGame(record) {
+    // La pantalla completa debe pedirse en el mismo clic, antes de cualquier espera
+    if ($('fsChk').checked) enterFullscreen();
+    const gm = document.querySelector('input[name="gm"]:checked').value;
+    const cats = GAME_MODES[gm];
+    if (record && (!window.MediaRecorder || !canvas.captureStream)) {
+      showError('Tu navegador no permite grabar video. Prueba con Chrome, Edge o Firefox, o juega sin grabar.'); return;
+    }
+    if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
+      showError('La cámara solo funciona en <b>localhost</b> o <b>HTTPS</b> (por ejemplo, GitHub Pages o Live Server).'); return;
+    }
+    hideError();
+    beep(1, 0.01);
+
+    show('loadingScreen'); hide('menuScreen'); hide('resultsScreen');
+    try {
+      if (!video.srcObject) {
+        $('loadingText').textContent = 'Activando cámara…';
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 }, facingMode: 'user' }, audio: false });
+        video.srcObject = stream;
+        await video.play();
+        W = video.videoWidth || 1280; H = video.videoHeight || 720;
+        canvas.width = W; canvas.height = H;
+        startDetectionLoop();
+      }
+      await ensureDetectors([...new Set(cats.map((c) => CAT_DET[c]))]);
+    } catch (e) {
+      console.error(e);
+      hide('loadingScreen'); show('menuScreen');
+      const denied = e && (e.name === 'NotAllowedError' || e.name === 'SecurityError');
+      showError(denied ? 'Se bloqueó el permiso de cámara. Habilítalo desde el candado de la barra de direcciones.'
+                       : 'No se pudo iniciar la cámara o cargar los modelos. Revisa tu conexión y que ninguna otra app use la cámara.');
+      return;
+    }
+
+    game.gameMode = gm;
+    game.list = buildList(cats, $('modeSel').value);
+    game.roundMs = Number($('timeSel').value);
+    game.showPts = $('showPts').checked;
+    game.results = []; game.idx = 0; game.cur = null; game.lastReq = null;
+    game.recording = record;
+    fileBase = `reto-emoji_${stamp()}`;
+    videoBlob = null;
+    if (videoUrl) { URL.revokeObjectURL(videoUrl); videoUrl = null; }
+    if (record) startRecording();
+
+    hide('loadingScreen');
+    $('gameCtrl').classList.remove('hidden');
+    game.state = 'intro';
+    game.introStart = performance.now();
+  }
+
+  function startRound(now) {
+    if (game.idx >= game.list.length) { endGame(); return; }
+    const c = game.list[game.idx];
+    for (const k of Object.keys(smoothState)) smoothState[k] = null;
+    game.latest = { kind: null, res: null };
+    const req = REQUIRE[c.cat] ? c.cat : null;
+    // Solo se pide encuadre cuando cambia el tipo de reto (no en cada ronda)
+    const needsFraming = req && req !== game.lastReq;
+    game.cur = { c, req, phase: needsFraming ? 'framing' : 'play', start: now, framingStart: now, frameOkSince: null,
+                 frameStatus: null, holdStart: null, lastOk: 0, best: 0, disp: 0, issues: {}, ev: null, videoT: null };
+    if (!needsFraming) beginPlay(now);
+  }
+  function beginPlay(now) {
+    const r = game.cur;
+    r.phase = 'play'; r.start = now;
+    r.videoT = game.recording ? (now - recStart) / 1000 : null;
+    beep(660, 0.12);
+  }
+
+  function finishRound(now, outcome) {   // outcome: 'ok' | 'fail' | 'skip'
+    const r = game.cur;
+    if (!r || r.phase === 'feedback') return;
+    const elapsed = (now - r.start) / 1000;
+    r.phase = 'feedback'; r.outcome = outcome; r.feedbackUntil = now + FEEDBACK_MS;
+    const topIssue = Object.entries(r.issues).sort((a, b) => b[1] - a[1])[0];
+    let issue = '';
+    if (outcome === 'fail') issue = topIssue ? topIssue[0] : '';
+    if (outcome === 'skip') issue = r.videoT === null ? 'Saltado durante el encuadre' : 'Saltado';
+    game.results.push({
+      n: game.idx + 1, id: r.c.id, emoji: r.c.emoji, label: r.c.label, cat: CAT_LABEL[r.c.cat],
+      outcome, time: outcome === 'ok' ? elapsed : null, best: Math.round(r.best * 100), issue,
+      videoT: r.videoT ?? (game.recording ? (now - recStart) / 1000 : null),
+    });
+    if (outcome === 'ok') { beep(880, 0.12); setTimeout(() => beep(1320, 0.18), 110); }
+    else if (outcome === 'fail') beep(220, 0.35, 'triangle');
+  }
+
+  async function endGame() {
+    if (game.state === 'ending' || game.state === 'results') return;
+    game.state = 'ending';
+    $('gameCtrl').classList.add('hidden');
+    if (game.recording) {
+      videoBlob = await stopRecording();
+      if (videoBlob) { videoUrl = URL.createObjectURL(videoBlob); download(videoUrl, `${fileBase}.${videoExt()}`); }
+    }
+    game.state = 'results';
+    renderResults();
+    show('resultsScreen');
+  }
+
+  // ===================== ENCUADRE =====================
+  const inFrame = (p) => p.x > 0.01 && p.x < 0.99 && p.y > 0 && p.y < 1;
+  /** Revisa qué partes se ven y genera la instrucción para el usuario. */
+  function framingStatus(req, res) {
+    const def = REQUIRE[req];
+    if (req === 'cara') {
+      const lm = res.faceLandmarks && res.faceLandmarks[0];
+      if (!lm) return { all: false, parts: [{ n: 'Tu cara', ok: false }], hint: 'Mira hacia la cámara' };
+      let x0 = 1, x1 = 0; for (const p of lm) { if (p.x < x0) x0 = p.x; if (p.x > x1) x1 = p.x; }
+      const w = x1 - x0;
+      const hint = w < 0.12 ? 'Acércate un poco a la cámara' : w > 0.65 ? 'Aléjate un poco de la cámara' : '¡Perfecto! Quédate ahí';
+      const ok = w >= 0.12 && w <= 0.65;
+      return { all: ok, parts: [{ n: 'Tu cara', ok }], hint };
+    }
+    const lm = res.landmarks && res.landmarks[0];
+    if (!lm) return { all: false, parts: def.parts.map((p) => ({ n: p.n, ok: false })), hint: 'Ponte frente a la cámara' };
+    const vis = (i) => (lm[i].visibility ?? 1) >= FRAME_VIS && inFrame(lm[i]);
+    const parts = def.parts.map((p) => ({ n: p.n, ok: p.ids.every(vis) }));
+    const miss = (n) => parts.some((p) => p.n === n && !p.ok);
+    let hint = '¡Perfecto! Quédate ahí';
+    const torso = Math.abs((lm[23].y + lm[24].y) / 2 - (lm[11].y + lm[12].y) / 2);
+    if (miss('Pies') || miss('Rodillas')) hint = 'Aléjate de la cámara (o bájala un poco) hasta que se vean tus pies';
+    else if (miss('Cabeza')) hint = 'Que se vea tu cabeza: aléjate un poco o sube la cámara';
+    else if (miss('Manos') || miss('Codos')) hint = 'Que se vean tus brazos y manos completos';
+    else if (miss('Caderas') || miss('Hombros')) hint = 'Ponte de frente, al centro de la imagen';
+    else if (req !== 'brazos' && torso < 0.12) hint = 'Estás muy lejos: acércate un paso';
+    return { all: parts.every((p) => p.ok), parts, hint };
+  }
+
+  // ===================== DETECCIÓN (una vez por frame de cámara) =====================
+  function detectionKind(r) { return r.req === 'cara' ? 'face' : CAT_DET[r.c.cat]; }
+
+  function onNewVideoFrame() {
+    if (game.state !== 'running' || !game.cur) return;
+    const r = game.cur;
+    if (r.phase !== 'play' && r.phase !== 'framing') return;
+    const kind = detectionKind(r), det = detectors[kind];
+    if (!det) return;
+    const now = performance.now();
+    const ts = Math.max(now, lastTs[kind] + 1);
+    lastTs[kind] = ts;
+    let res;
+    try { res = smoothResult(kind, det.detectForVideo(video, ts)); }
+    catch (e) { console.error('Detección:', e); return; }
+    game.latest = { kind, res };
+
+    if (r.phase === 'framing') {
+      const st = framingStatus(r.req, res);
+      r.frameStatus = st;
+      if (st.all) {
+        if (!r.frameOkSince) r.frameOkSince = now;
+        if (now - r.frameOkSince >= FRAME_OK_MS) {
+          r.phase = 'framed'; r.framedUntil = now + FRAMED_MSG_MS;
+          game.lastReq = r.req;
+          beep(990, 0.15);
+        }
+      } else r.frameOkSince = null;
+      return;
+    }
+
+    // Fase de juego
+    const ev = r.c.check(res);
+    r.ev = ev;
+    r.best = Math.max(r.best, ev.score || 0);
+    if (r.req) r.frameStatus = framingStatus(r.req, res);
+    if (ev.issue && !ev.ok) r.issues[ev.issue] = (r.issues[ev.issue] || 0) + 1;
+    if (ev.ok) { r.lastOk = now; if (!r.holdStart) r.holdStart = now; }
+    else if (r.holdStart && now - r.lastOk > GRACE_MS) r.holdStart = null;
+    if (r.holdStart && now - r.holdStart >= HOLD_MS) finishRound(now, 'ok');
+  }
+
+  let lastVideoTime = -1;
+  const hasRVFC = 'requestVideoFrameCallback' in HTMLVideoElement.prototype;
+  function startDetectionLoop() {
+    if (!hasRVFC) return;   // sin soporte: se detecta desde el bucle de dibujo
+    const cb = () => { onNewVideoFrame(); video.requestVideoFrameCallback(cb); };
+    video.requestVideoFrameCallback(cb);
+  }
+
+  // ===================== BUCLE DE DIBUJO (60 fps) =====================
+  function frame() {
+    const now = performance.now();
+    if (!hasRVFC && video.readyState >= 2 && video.currentTime !== lastVideoTime) {
+      lastVideoTime = video.currentTime; onNewVideoFrame();
+    }
+    if (video.readyState >= 2 && game.state !== 'menu') {
+      ctx.save(); ctx.translate(W, 0); ctx.scale(-1, 1);
+      ctx.drawImage(video, 0, 0, W, H);
+      ctx.restore();
+
+      if (game.state === 'intro') {
+        const left = INTRO_MS - (now - game.introStart);
+        drawIntro(Math.ceil(left / 1000));
+        if (left <= 0) { game.state = 'running'; startRound(now); }
+      } else if (game.state === 'running' && game.cur) {
+        const r = game.cur;
+        if (r.phase === 'play' && now - r.start >= game.roundMs) finishRound(now, 'fail');
+        if (r.phase === 'framed' && now >= r.framedUntil) beginPlay(now);
+        if (r.phase === 'feedback' && now >= r.feedbackUntil) { game.idx++; startRound(now); }
+
+        const cur = game.cur;
+        if (cur && game.showPts && game.latest.res && cur.phase !== 'feedback') drawLandmarks(game.latest.kind, game.latest.res);
+        if (cur) {
+          if (cur.phase === 'framing' || cur.phase === 'framed') drawFraming(now, cur);
+          else drawHUD(now, cur);
+        }
+      }
+      if (game.recording && (game.state === 'intro' || game.state === 'running')) drawRec(now);
+    }
+    requestAnimationFrame(frame);
+  }
+
+  // ===================== DIBUJO =====================
+  const S = () => H / 720;
+  const FONT = '"Bricolage Grotesque", system-ui, sans-serif';
+  const EMOJI_FONT = '"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
+
+  function rr(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+  }
+  function panel(x, y, w, h, r, fill = 'rgba(12,16,32,.8)') { rr(x, y, w, h, r); ctx.fillStyle = fill; ctx.fill(); }
+  function text(t, x, y, size, color = '#fff', weight = 800, align = 'center') {
+    ctx.font = `${weight} ${size}px ${FONT}`; ctx.fillStyle = color; ctx.textAlign = align; ctx.textBaseline = 'middle';
+    ctx.fillText(t, x, y);
+  }
+  function emoji(e, x, y, size) {
+    ctx.font = `${size}px ${EMOJI_FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#fff';
+    ctx.fillText(e, x, y);
+  }
+  /** Divide un texto en líneas que caben en maxW. */
+  function wrapLines(t, maxW, size, weight = 800) {
+    ctx.font = `${weight} ${size}px ${FONT}`;
+    const words = t.split(' '), lines = [];
+    let line = '';
+    for (const w of words) {
+      const test = line ? `${line} ${w}` : w;
+      if (ctx.measureText(test).width > maxW && line) { lines.push(line); line = w; } else line = test;
+    }
+    if (line) lines.push(line);
+    return lines;
+  }
+
+  function drawIntro(n) {
+    const s = S();
+    ctx.fillStyle = 'rgba(5,8,18,.45)'; ctx.fillRect(0, 0, W, H);
+    text('¡Prepárate!', W / 2, H / 2 - 120 * s, 44 * s);
+    text(String(Math.max(1, n)), W / 2, H / 2 + 20 * s, 180 * s, '#6ff0c8');
+    text('Imita cada emoji antes de que se acabe el tiempo', W / 2, H / 2 + 150 * s, 24 * s, '#e3e6ef', 600);
+  }
+
+  /** Tarjeta del reto en la esquina superior izquierda: el centro queda libre para que te veas. */
+  function drawChallengeCard(r, now, compact) {
+    const s = S(), c = r.c;
+    const x = 20 * s, y = 20 * s, w = 430 * s;
+    const lines = wrapLines(c.label, 270 * s, 25 * s);
+    const hintLines = c.hint && !compact ? wrapLines(c.hint, 270 * s, 15 * s, 600) : [];
+    const textH = 26 * s + lines.length * 30 * s + hintLines.length * 20 * s;
+    const h = Math.max(150 * s, textH + 24 * s);
+    panel(x, y, w, h, 24 * s);
+    const ex = x + 78 * s, ey = y + h / 2;
+    const hold = r.holdStart && r.phase === 'play' ? clamp((now - r.holdStart) / HOLD_MS, 0, 1) : 0;
+    ctx.lineWidth = 7 * s; ctx.lineCap = 'round';
+    ctx.strokeStyle = 'rgba(255,255,255,.15)'; ctx.beginPath(); ctx.arc(ex, ey, 56 * s, 0, Math.PI * 2); ctx.stroke();
+    if (hold > 0) { ctx.strokeStyle = '#6ff0c8'; ctx.beginPath(); ctx.arc(ex, ey, 56 * s, -Math.PI / 2, -Math.PI / 2 + hold * Math.PI * 2); ctx.stroke(); }
+    emoji(c.emoji, ex, ey + 4 * s, 78 * s);
+    const tx = x + 150 * s;
+    let ty = ey - textH / 2 + 10 * s;
+    text(`Reto ${game.idx + 1} de ${game.list.length} · ${CAT_LABEL[c.cat]}`, tx, ty, 15 * s, '#a9b0c4', 600, 'left');
+    ty += 28 * s;
+    for (const ln of lines) { text(ln, tx, ty, 25 * s, '#fff', 800, 'left'); ty += 30 * s; }
+    for (const ln of hintLines) { text(ln, tx, ty - 4 * s, 15 * s, '#ffd34d', 600, 'left'); ty += 20 * s; }
+  }
+
+  function drawHUD(now, r) {
+    const s = S(), ev = r.ev || { score: 0 };
+    const playing = r.phase === 'play';
+    r.disp += ((ev.score || 0) - r.disp) * 0.25;   // medidor animado suave
+
+    drawChallengeCard(r, now, false);
+
+    // Indicador de visibilidad del cuerpo durante el reto
+    if (playing && r.req && r.frameStatus && r.req !== 'cara') {
+      const st = r.frameStatus;
+      const msg = st.all ? '✅ Cuerpo bien encuadrado' : `⚠️ No se ven: ${st.parts.filter((p) => !p.ok).map((p) => p.n.toLowerCase()).join(', ')}`;
+      ctx.font = `700 ${17 * s}px ${FONT}`;
+      const tw = ctx.measureText(msg).width + 28 * s;
+      panel(20 * s, 186 * s, tw, 36 * s, 18 * s, st.all ? 'rgba(20,70,58,.85)' : 'rgba(90,60,10,.88)');
+      text(msg, 34 * s, 204 * s, 17 * s, st.all ? '#6ff0c8' : '#ffd34d', 700, 'left');
+    }
+
+    // Barra de tiempo
+    const bx = 40 * s, by = H - 50 * s, bw = W - 80 * s, bh = 18 * s;
+    const left = playing ? clamp(1 - (now - r.start) / game.roundMs, 0, 1) : 0;
+    panel(bx, by, bw, bh, bh / 2, 'rgba(17,22,40,.75)');
+    if (left > 0) {
+      rr(bx, by, Math.max(bh, bw * left), bh, bh / 2);
+      ctx.fillStyle = left > 0.4 ? '#6ff0c8' : left > 0.2 ? '#ffd34d' : '#ff5c7a'; ctx.fill();
+    }
+    if (playing) {
+      panel(W - 112 * s, by - 72 * s, 72 * s, 60 * s, 16 * s);
+      text(`${Math.ceil(left * game.roundMs / 1000)}`, W - 76 * s, by - 42 * s, 40 * s);
+    }
+
+    if (playing) {
+      const mx = 40 * s, my = by - 40 * s, mw = 260 * s, mh = 14 * s;
+      panel(mx - 12 * s, my - 34 * s, mw + 84 * s, 58 * s, 14 * s, 'rgba(12,16,32,.7)');
+      text('Detección', mx, my - 16 * s, 16 * s, '#a9b0c4', 600, 'left');
+      panel(mx, my, mw, mh, mh / 2, 'rgba(255,255,255,.12)');
+      rr(mx, my, Math.max(mh, mw * clamp(r.disp, 0, 1)), mh, mh / 2);
+      ctx.fillStyle = ev.ok ? '#6ff0c8' : '#c89bff'; ctx.fill();
+      text(`${Math.round(r.disp * 100)}%`, mx + mw + 12 * s, my + mh / 2, 17 * s, '#fff', 700, 'left');
+      if (!ev.ok && ev.issue) {
+        ctx.font = `700 ${22 * s}px ${FONT}`;
+        const tw = ctx.measureText(ev.issue).width + 30 * s;
+        panel(W / 2 - tw / 2, by - 66 * s, tw, 42 * s, 21 * s, 'rgba(12,16,32,.85)');
+        text(ev.issue, W / 2, by - 45 * s, 22 * s, '#ffd34d', 700);
+      }
+    }
+
+    if (r.phase === 'feedback') {
+      const okk = r.outcome === 'ok', skip = r.outcome === 'skip';
+      ctx.fillStyle = okk ? 'rgba(111,240,200,.18)' : skip ? 'rgba(255,211,77,.14)' : 'rgba(255,92,122,.18)';
+      ctx.fillRect(0, 0, W, H);
+      emoji(okk ? '✅' : skip ? '⏭️' : '❌', W / 2, H / 2 + 20 * s, 140 * s);
+      text(okk ? '¡Logrado!' : skip ? 'Reto saltado' : 'No se detectó', W / 2, H / 2 + 130 * s, 48 * s,
+           okk ? '#6ff0c8' : skip ? '#ffd34d' : '#ff5c7a');
+    }
+  }
+
+  /** Pantalla de encuadre: checklist de partes visibles + guía en el centro. */
+  function drawFraming(now, r) {
+    const s = S(), st = r.frameStatus;
+    const done = r.phase === 'framed';
+    const ready = st && st.all && r.frameOkSince ? clamp((now - r.frameOkSince) / FRAME_OK_MS, 0, 1) : 0;
+
+    // Guía de dónde ubicarse
+    const full = r.req === 'piernas' || r.req === 'cuerpo';
+    const gw = (r.req === 'cara' ? 0.34 : full ? 0.36 : 0.56) * W;
+    const gh = (r.req === 'cara' ? 0.62 : full ? 0.92 : 0.8) * H;
+    const gx = W / 2 - gw / 2, gy = r.req === 'cara' ? H * 0.16 : full ? H * 0.04 : H * 0.06;
+    ctx.save();
+    ctx.setLineDash([14 * s, 10 * s]); ctx.lineWidth = 4 * s;
+    ctx.strokeStyle = done || ready >= 1 ? '#6ff0c8' : st && st.all ? 'rgba(111,240,200,.8)' : 'rgba(255,255,255,.55)';
+    rr(gx, gy, gw, gh, 40 * s); ctx.stroke();
+    ctx.restore();
+
+    // Panel lateral con la lista
+    const x = 20 * s, y = 20 * s, w = 400 * s;
+    const parts = st ? st.parts : REQUIRE[r.req].parts.map((p) => ({ n: p.n, ok: false }));
+    const hintLines = wrapLines(done ? REQUIRE[r.req].msg : (st ? st.hint : 'Buscándote…'), w - 40 * s, 19 * s, 700);
+    const h = 150 * s + parts.length * 36 * s + hintLines.length * 24 * s;
+    panel(x, y, w, h, 24 * s, done ? 'rgba(14,60,50,.9)' : 'rgba(12,16,32,.85)');
+    text('Ubícate para el siguiente reto', x + 20 * s, y + 32 * s, 20 * s, '#fff', 800, 'left');
+    emoji(r.c.emoji, x + 42 * s, y + 82 * s, 40 * s);
+    text(CAT_LABEL[r.c.cat], x + 76 * s, y + 82 * s, 17 * s, '#a9b0c4', 600, 'left');
+    let ty = y + 130 * s;
+    for (const p of parts) {
+      emoji(p.ok ? '✅' : '⭕', x + 34 * s, ty, 20 * s);
+      text(p.n, x + 58 * s, ty, 19 * s, p.ok ? '#6ff0c8' : '#e3e6ef', 700, 'left');
+      ty += 36 * s;
+    }
+    ty += 4 * s;
+    for (const ln of hintLines) { text(ln, x + 20 * s, ty, 19 * s, done ? '#6ff0c8' : '#ffd34d', 700, 'left'); ty += 24 * s; }
+
+    // Progreso de "quédate ahí"
+    if (ready > 0 && !done) {
+      panel(x + 20 * s, y + h - 18 * s, (w - 40 * s), 6 * s, 3 * s, 'rgba(255,255,255,.12)');
+      panel(x + 20 * s, y + h - 18 * s, (w - 40 * s) * ready, 6 * s, 3 * s, '#6ff0c8');
+    }
+    if (done) {
+      text(REQUIRE[r.req].msg, W / 2, H - 80 * s, 40 * s, '#6ff0c8');
+    } else if (now - r.framingStart > 12000) {
+      text('¿No logras encuadrarte? Puedes saltar este reto', W / 2, H - 70 * s, 22 * s, '#ffd34d', 700);
+    }
+  }
+
+  function drawRec(now) {
+    const s = S(), cx = W / 2;
+    panel(cx - 55 * s, 16 * s, 110 * s, 36 * s, 18 * s);
+    ctx.fillStyle = Math.floor(now / 600) % 2 ? '#ff3b3b' : 'rgba(255,59,59,.4)';
+    ctx.beginPath(); ctx.arc(cx - 30 * s, 34 * s, 8 * s, 0, Math.PI * 2); ctx.fill();
+    text('REC', cx + 10 * s, 35 * s, 17 * s, '#fff', 800);
+  }
+
+  const MX = (x) => (1 - x) * W, MY = (y) => y * H;
+  const HAND_C = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]];
+  const POSE_C = [[11,12],[11,13],[13,15],[12,14],[14,16],[11,23],[12,24],[23,24],[23,25],[25,27],[24,26],[26,28]];
+  function drawLines(lm, pairs, color, minVis = 0) {
+    ctx.strokeStyle = color; ctx.lineWidth = 3 * S(); ctx.lineCap = 'round';
+    ctx.beginPath();
+    for (const [a, b] of pairs) {
+      if ((lm[a].visibility ?? 1) < minVis || (lm[b].visibility ?? 1) < minVis) continue;
+      ctx.moveTo(MX(lm[a].x), MY(lm[a].y)); ctx.lineTo(MX(lm[b].x), MY(lm[b].y));
+    }
+    ctx.stroke();
+  }
+  function dots(lm, ids, color, r) {
+    ctx.fillStyle = color; ctx.beginPath();
+    for (const i of ids) { ctx.moveTo(MX(lm[i].x) + r, MY(lm[i].y)); ctx.arc(MX(lm[i].x), MY(lm[i].y), r, 0, Math.PI * 2); }
+    ctx.fill();
+  }
+  function drawLandmarks(kind, res) {
+    const s = S();
+    if (kind === 'face' && res.faceLandmarks && res.faceLandmarks[0]) {
+      const lm = res.faceLandmarks[0];
+      ctx.fillStyle = 'rgba(111,240,200,.7)';
+      for (let i = 0; i < lm.length; i += 4) ctx.fillRect(MX(lm[i].x) - s, MY(lm[i].y) - s, 2 * s, 2 * s);
+    } else if (kind === 'hand' && res.landmarks) {
+      for (const lm of res.landmarks) { drawLines(lm, HAND_C, 'rgba(255,255,255,.75)'); dots(lm, lm.map((_, i) => i), '#6ff0c8', 4 * s); }
+    } else if (kind === 'pose' && res.landmarks && res.landmarks[0]) {
+      const lm = res.landmarks[0];
+      drawLines(lm, POSE_C, 'rgba(255,255,255,.8)', 0.5);
+      dots(lm, [0, 11, 12, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28].filter((i) => (lm[i].visibility ?? 1) >= 0.5), '#6ff0c8', 6 * s);
+    }
+  }
+
+  // ===================== RESULTADOS =====================
+  const OUT_LABEL = { ok: 'Logrado', fail: 'No detectado', skip: 'Saltado' };
+  const OUT_CLASS = { ok: 'ok', fail: 'bad', skip: 'skip' };
+  function renderResults() {
+    const R = game.results, ok = R.filter((r) => r.outcome === 'ok').length;
+    $('scoreBig').textContent = `${ok}/${R.length}`;
+    const skipped = R.filter((r) => r.outcome === 'skip').length;
+    $('scoreSub').textContent = R.length
+      ? `${Math.round(ok / R.length * 100)}% de retos detectados${skipped ? ` · ${skipped} saltado${skipped > 1 ? 's' : ''}` : ''}`
+      : 'No alcanzaste a completar ningún reto';
+    const byCat = {};
+    for (const r of R) { byCat[r.cat] = byCat[r.cat] || [0, 0]; byCat[r.cat][1]++; if (r.outcome === 'ok') byCat[r.cat][0]++; }
+    $('catStats').innerHTML = Object.entries(byCat).map(([k, [a, b]]) => `<span>${k}: ${a}/${b}</span>`).join('');
+    $('resultsBody').innerHTML = R.map((r) => `
+      <tr>
+        <td>${r.n}</td><td class="emo">${r.emoji}</td><td>${r.label}</td>
+        <td class="${OUT_CLASS[r.outcome]}">${OUT_LABEL[r.outcome]}</td>
+        <td>${r.time !== null ? r.time.toFixed(1) + ' s' : '—'}</td>
+        <td>${r.best}%</td><td>${r.issue || '—'}</td>
+        <td>${r.videoT === null ? '—' : r.videoT.toFixed(1) + ' s'}</td>
+      </tr>`).join('');
+    const has = !!videoUrl;
+    $('videoBox').style.display = has ? '' : 'none';
+    $('dlVideoBtn').style.display = has ? '' : 'none';
+    if (has) {
+      const pv = $('videoPreview');
+      pv.src = videoUrl; pv.style.display = 'block';
+      $('videoNote').textContent = 'El video ya se descargó en este dispositivo (carpeta Descargas). La columna "Seg. en video" indica en qué segundo empieza cada reto, para revisarlo junto con el CSV.';
+    }
+  }
+  function csv() {
+    const head = ['n', 'reto', 'emoji', 'categoria', 'resultado', 'tiempo_s', 'mejor_deteccion_pct', 'problema_mas_frecuente', 'inicio_en_video_s', 'modo_juego', 'modelo_pose'];
+    const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const rows = game.results.map((r) => [r.n, r.label, r.emoji, r.cat, OUT_LABEL[r.outcome].toLowerCase(),
+      r.time !== null ? r.time.toFixed(1).replace('.', ',') : '', r.best, r.issue,
+      r.videoT === null ? '' : r.videoT.toFixed(1).replace('.', ','), game.gameMode, poseModelName].map(esc).join(';'));
+    return '\ufeff' + [head.join(';'), ...rows].join('\r\n');
+  }
+
+  // ===================== UI GENERAL =====================
+  const show = (id) => $(id).classList.remove('hidden');
+  const hide = (id) => $(id).classList.add('hidden');
+  function showError(m) { $('errorBox').innerHTML = m; $('errorBox').classList.add('show'); }
+  function hideError() { $('errorBox').classList.remove('show'); }
+  function skipRound() {
+    if (game.state === 'running' && game.cur && game.cur.phase !== 'feedback') finishRound(performance.now(), 'skip');
+  }
+
+  $('noticeMain').textContent = NOTICE_MAIN;
+  $('noticeDetail').innerHTML = NOTICE_DETAIL.map((p) => `<p>${p}</p>`).join('');
+  $('consentChk').addEventListener('change', (e) => { $('playRecBtn').disabled = !e.target.checked; });
+  $('playRecBtn').addEventListener('click', () => startGame(true));
+  $('playNoRecBtn').addEventListener('click', () => startGame(false));
+  $('fsBtn').addEventListener('click', toggleFullscreen);
+  $('skipBtn').addEventListener('click', skipRound);
+  $('exitBtn').addEventListener('click', () => {
+    if (game.state === 'running' && game.cur && game.cur.phase === 'play') finishRound(performance.now(), 'fail');
+    endGame();
+  });
+  $('againBtn').addEventListener('click', () => startGame(game.recording));
+  $('menuBtn').addEventListener('click', () => {
+    hide('resultsScreen'); show('menuScreen'); game.state = 'menu';
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  });
+  $('dlVideoBtn').addEventListener('click', () => { if (videoUrl) download(videoUrl, `${fileBase}.${videoExt()}`); });
+  $('dlCsvBtn').addEventListener('click', () => {
+    const url = URL.createObjectURL(new Blob([csv()], { type: 'text/csv;charset=utf-8' }));
+    download(url, `${fileBase}_resultados.csv`);
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  });
+  window.addEventListener('keydown', (e) => {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+    const k = e.key.toLowerCase();
+    if (k === 'f' && game.state !== 'menu') toggleFullscreen();
+    else if (k === 'n') skipRound();
+  });
+
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
